@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10131c">
+  <title>Simple Calculator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #10131c;
+      color: #f5f7ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+      background: radial-gradient(circle at top, #252b40, #10131c 55%);
+    }
+
+    .calculator {
+      width: min(100%, 360px);
+      padding: 1.25rem;
+      border: 1px solid #343b50;
+      border-radius: 1.25rem;
+      background: #191e2b;
+      box-shadow: 0 1.5rem 4rem #0008;
+    }
+
+    h1 {
+      margin: 0 0 1rem;
+      color: #aab4ca;
+      font-size: .85rem;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .display {
+      min-height: 5.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: flex-end;
+      gap: .35rem;
+      overflow: hidden;
+      margin-bottom: 1rem;
+      padding: .8rem 1rem;
+      border-radius: .8rem;
+      background: #10141e;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #expression {
+      max-width: 100%;
+      overflow: hidden;
+      color: #9aa5bc;
+      font-size: 1rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #result {
+      max-width: 100%;
+      overflow: hidden;
+      font-size: clamp(1.8rem, 9vw, 2.5rem);
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .keys {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: .65rem;
+    }
+
+    button {
+      min-height: 3.75rem;
+      border: 0;
+      border-radius: .8rem;
+      background: #292f40;
+      color: #f5f7ff;
+      cursor: pointer;
+      font: inherit;
+      font-size: 1.2rem;
+      transition: background .15s, transform .08s;
+    }
+
+    button:hover { background: #373f54; }
+    button:active { transform: scale(.96); }
+    button:focus-visible { outline: 2px solid #8da7ff; outline-offset: 2px; }
+    button.utility { background: #343c50; color: #c4d0f0; }
+    button.operator { background: #303b61; color: #b8c8ff; }
+    button.equals { grid-row: span 2; background: #6684f5; color: #fff; }
+    button.zero { grid-column: span 2; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="calculator" aria-label="Calculator">
+    <h1>Calculator</h1>
+    <section class="display" aria-live="polite" aria-atomic="true">
+      <div id="expression"></div>
+      <div id="result">0</div>
+    </section>
+    <div class="keys">
+      <button class="utility" data-action="clear" aria-label="Clear">AC</button>
+      <button class="utility" data-action="backspace" aria-label="Backspace">⌫</button>
+      <button class="utility" data-action="sign" aria-label="Change sign">±</button>
+      <button class="operator" data-value="/" aria-label="Divide">÷</button>
+
+      <button data-value="7">7</button>
+      <button data-value="8">8</button>
+      <button data-value="9">9</button>
+      <button class="operator" data-value="*" aria-label="Multiply">×</button>
+
+      <button data-value="4">4</button>
+      <button data-value="5">5</button>
+      <button data-value="6">6</button>
+      <button class="operator" data-value="-" aria-label="Subtract">−</button>
+
+      <button data-value="1">1</button>
+      <button data-value="2">2</button>
+      <button data-value="3">3</button>
+      <button class="operator" data-value="+" aria-label="Add">+</button>
+
+      <button class="zero" data-value="0">0</button>
+      <button data-action="decimal">.</button>
+      <button class="equals" data-action="equals" aria-label="Equals">=</button>
+    </div>
+  </main>
+
+  <script>
+    const expressionDisplay = document.querySelector('#expression');
+    const resultDisplay = document.querySelector('#result');
+    let current = '0';
+    let stored = null;
+    let operator = null;
+    let replaceCurrent = false;
+
+    function updateDisplay() {
+      expressionDisplay.textContent = stored !== null && operator
+        ? `${format(stored)} ${operatorSymbol(operator)}`
+        : '';
+      resultDisplay.textContent = current;
+    }
+
+    function format(value) {
+      return Number(value).toLocaleString('en-US', { maximumFractionDigits: 10 });
+    }
+
+    function operatorSymbol(value) {
+      return ({ '*': '×', '/': '÷', '-': '−', '+': '+' })[value] || value;
+    }
+
+    function inputDigit(digit) {
+      if (replaceCurrent || current === 'Error') {
+        current = digit;
+        replaceCurrent = false;
+      } else if (current === '0') {
+        current = digit;
+      } else if (current.replace('-', '').length < 14) {
+        current += digit;
+      }
+      updateDisplay();
+    }
+
+    function chooseOperator(nextOperator) {
+      if (current === 'Error') return;
+      if (operator && !replaceCurrent) calculate();
+      stored = Number(current);
+      operator = nextOperator;
+      replaceCurrent = true;
+      updateDisplay();
+    }
+
+    function calculate() {
+      if (operator === null || stored === null || current === 'Error') return;
+      const a = stored;
+      const b = Number(current);
+      let answer;
+
+      switch (operator) {
+        case '+': answer = a + b; break;
+        case '-': answer = a - b; break;
+        case '*': answer = a * b; break;
+        case '/':
+          if (b === 0) {
+            current = 'Error';
+            stored = null;
+            operator = null;
+            replaceCurrent = true;
+            updateDisplay();
+            return;
+          }
+          answer = a / b;
+          break;
+        default: return;
+      }
+
+      current = String(Number(answer.toPrecision(10)));
+      stored = null;
+      operator = null;
+      replaceCurrent = true;
+      updateDisplay();
+    }
+
+    function performAction(action) {
+      switch (action) {
+        case 'clear':
+          current = '0'; stored = null; operator = null; replaceCurrent = false;
+          updateDisplay();
+          break;
+        case 'backspace':
+          if (current === 'Error' || replaceCurrent) {
+            current = '0'; replaceCurrent = false;
+          } else {
+            current = current.length > 1 ? current.slice(0, -1) : '0';
+            if (current === '-') current = '0';
+          }
+          updateDisplay();
+          break;
+        case 'decimal':
+          if (replaceCurrent || current === 'Error') {
+            current = '0.'; replaceCurrent = false;
+          } else if (!current.includes('.')) {
+            current += '.';
+          }
+          updateDisplay();
+          break;
+        case 'sign':
+          if (current !== '0' && current !== 'Error') {
+            current = current.startsWith('-') ? current.slice(1) : `-${current}`;
+          }
+          updateDisplay();
+          break;
+        case 'equals': calculate(); break;
+      }
+    }
+
+    document.querySelector('.keys').addEventListener('click', (event) => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      if (button.dataset.value !== undefined) {
+        if (/^\d$/.test(button.dataset.value)) inputDigit(button.dataset.value);
+        else chooseOperator(button.dataset.value);
+      } else {
+        performAction(button.dataset.action);
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (/^\d$/.test(event.key)) inputDigit(event.key);
+      else if (['+', '-', '*', '/'].includes(event.key)) chooseOperator(event.key);
+      else if (event.key === '.' || event.key === ',') performAction('decimal');
+      else if (event.key === 'Enter' || event.key === '=') performAction('equals');
+      else if (event.key === 'Backspace') performAction('backspace');
+      else if (event.key === 'Escape' || event.key === 'Delete') performAction('clear');
+      else return;
+      event.preventDefault();
+    });
+
+    updateDisplay();
+  </script>
+</body>
+</html>
